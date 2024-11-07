@@ -47,6 +47,10 @@ jobs:
           sleep 1
         done
     
+    - name: Create Database
+      run: |
+        PGPASSWORD=secret createdb -h localhost -U root task_managment_system_db
+    
     - name: Install golang-migrate
       env:
         version: v4.15.2  # Set the version of golang-migrate you want to install
