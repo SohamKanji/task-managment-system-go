@@ -40,10 +40,6 @@ jobs:
             sleep 1
           done
 
-      - name: Create Database
-        run: |
-          PGPASSWORD=secret createdb -h localhost -U root task-managment-system-db
-
       - name: Build
         run: go build -v ./...
 
