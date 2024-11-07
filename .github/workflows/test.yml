@@ -7,65 +7,59 @@ on:
     branches: [ "main" ]
 
 jobs:
-
   test:
     runs-on: ubuntu-latest
 
     services:
-        # Label used to access the service container
-        postgres:
-          # Docker Hub image
-          image: postgres
-          # Provide the password for postgres
-          env:
-            POSTGRES_USER: root
-            POSTGRES_PASSWORD: secret
-            POSTGRES_DB: task-managmnt-system-db
-          # Set health checks to wait until postgres has started
-          options: >-
-            --health-cmd pg_isready
-            --health-interval 10s
-            --health-timeout 5s
-            --health-retries 5
-          ports:
-                # Maps tcp port 5432 on service container to the host
-                - 5432:5432
+      postgres:
+        image: postgres:alpine
+        env:
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: task-managment-system-db  # Use the intended name with hyphens
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.22.5'
-    
-    - name: Wait for Postgres
-      run: |
-        until pg_isready -h localhost -p 5432 -U root -d task-managment-system-db
-        do
-          echo "Waiting for postgres..."
-          sleep 1
-        done
-    
-    - name: Create Database
-      run: |
-        PGPASSWORD=secret createdb -h localhost -U root task_managment_system_db
-    
-    - name: Build
-      run: go build -v ./...
-    
-    - name: Install golang-migrate
-      env:
-        version: v4.15.2  # Set the version of golang-migrate you want to install
-        os: linux
-        arch: amd64
-      run: |
-        curl -L https://github.com/golang-migrate/migrate/releases/download/$version/migrate.$os-$arch.tar.gz | tar xvz
-        sudo mv migrate /usr/local/bin
-        migrate -version
-    
-    - name: Run mirateup
-      run: make migrateup
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22.5'
 
-    - name: Test
-      run: go test -v ./...
+      - name: Wait for Postgres
+        run: |
+          until pg_isready -h localhost -p 5432 -U root -d task-managment-system-db; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 1
+          done
+
+      - name: Create Database
+        run: |
+          PGPASSWORD=secret createdb -h localhost -U root task-managment-system-db
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Install golang-migrate
+        env:
+          version: v4.15.2
+          os: linux
+          arch: amd64
+        run: |
+          curl -L https://github.com/golang-migrate/migrate/releases/download/$version/migrate.$os-$arch.tar.gz | tar xvz
+          sudo mv migrate /usr/local/bin
+          migrate -version
+
+      - name: Run Migrations
+        run: |
+          migrate -path db/migration -database "postgresql://root:secret@localhost:5432/task-managment-system-db?sslmode=disable" -verbose up
+
+      - name: Run Tests
+        run: go test -v ./...
